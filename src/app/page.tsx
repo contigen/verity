@@ -13,6 +13,7 @@ import {
   Users,
   Lock,
 } from 'lucide-react'
+import { logo } from '@/components/ui/logo'
 
 export default function Home() {
   return (
@@ -20,7 +21,7 @@ export default function Home() {
       <header className='border-b border-border/40 backdrop-blur-sm fixed top-0 left-0 right-0 z-50'>
         <div className='container flex items-center justify-between py-4'>
           <div className='flex items-center gap-2'>
-            <Shield className='w-8 h-8 text-[hsl(var(--gold))]' />
+            {logo}
             <span className='text-2xl font-bold'>verity</span>
           </div>
           <nav className='hidden md:flex items-center gap-8'>
@@ -575,43 +576,6 @@ export default function Home() {
           </div>
         </section>
       </main>
-
-      <footer className='border-t border-border py-12 bg-primary'>
-        <div className='container'>
-          <div className='grid grid-cols-1 md:grid-cols-4 gap-8 mb-12'>
-            <div>
-              <div className='flex items-center gap-2 mb-4'>
-                <Shield className='w-6 h-6 text-[hsl(var(--gold))]' />
-                <span className='text-xl font-bold'>verity</span>
-              </div>
-              <p className='text-sm text-muted-foreground mb-4'>
-                AI-powered wallet reputation scoring and Sybil detection for
-                Web3
-              </p>
-              <div className='flex gap-4'>
-                <Link
-                  href='#'
-                  className='text-muted-foreground hover:text-foreground transition-colors'
-                >
-                  <svg
-                    xmlns='http://www.w3.org/2000/svg'
-                    width='20'
-                    height='20'
-                    viewBox='0 0 24 24'
-                    fill='none'
-                    stroke='currentColor'
-                    strokeWidth='2'
-                    strokeLinecap='round'
-                    strokeLinejoin='round'
-                  >
-                    <path d='M22 4s-.7 2.1-2 3.4c1.6 10-9.4 17.3-18 11.6 2.2.1 4.4-.6 6-2C3 15.5.5 9.6 3 5c2.2 2.6 5.6 4.1 9 4-.9-4.2 4-6.6 7-3.8 1.1 0 3-1.2 3-1.2z'></path>
-                  </svg>
-                </Link>
-              </div>
-            </div>
-          </div>
-        </div>
-      </footer>
     </div>
   )
 }

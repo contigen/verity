@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { ThirdwebProvider } from 'thirdweb/react'
 import {
   Card,
   CardContent,
@@ -19,16 +20,26 @@ import { Loader2, MessageSquare, ThumbsUp, Shield, User } from 'lucide-react'
 import { AISuggestionModal } from '@/components/ai-suggestion-modal'
 import { EndorsementSuccess } from '@/components/endorsement-success'
 import { cn } from '@/lib/utils'
+import { useAccount, useWriteContract } from 'wagmi'
+import { CONTRACT_ADDRESS, endorsementRegistryABI } from './contract'
+import { readContract } from 'viem/actions'
 
 export default function EndorsementsPage() {
   const [endorsementText, setEndorsementText] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [walletAddress, setWalletAddress] = useState(
-    '0x3B5AD5c4795c026514f8317c7a215E218DcCD6c'
-  )
+  const [walletAddress, setWalletAddress] = useState('')
   const [selectedType, setSelectedType] = useState<string | null>(null)
   const [showAISuggestions, setShowAISuggestions] = useState(false)
   const [showSuccess, setShowSuccess] = useState(false)
+  const [receivedEndorsements, setReceivedEndorsements] = useState([
+    {
+      id: 0,
+      from: '',
+      text: '',
+      date: '',
+      trustScore: 0,
+    },
+  ])
 
   const endorsementTypes = [
     'DAO Contributor',
@@ -38,20 +49,42 @@ export default function EndorsementsPage() {
     'Protocol Developer',
   ]
 
-  const handleSubmit = () => {
-    if (endorsementText) {
+  const { address: connectedWallet } = useAccount()
+  const [walletInput, setWalletInput] = useState('')
+
+  const { writeContractAsync } = useWriteContract()
+
+  const handleSubmit = async () => {
+    if (!connectedWallet) {
+      alert(`Connect your wallet first`)
+      return
+    }
+
+    if (!walletInput || !endorsementText) return
+
+    try {
       setIsSubmitting(true)
-      // Simulate submission
-      setTimeout(() => {
-        setIsSubmitting(false)
-        setEndorsementText('')
-        setShowSuccess(true)
-      }, 1500)
+
+      await writeContractAsync({
+        address: CONTRACT_ADDRESS,
+        abi: endorsementRegistryABI,
+        functionName: `endorse`,
+        args: [walletInput, endorsementText],
+      })
+
+      setEndorsementText(``)
+      setWalletInput(``)
+      setShowSuccess(true)
+    } catch (err) {
+      console.error(`Endorsement failed`, err)
+      alert(`Transaction failed`)
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
   // Mock received endorsements
-  const receivedEndorsements = [
+  const _receivedEndorsements = [
     {
       id: 1,
       from: '0x3B5AD5c4795c026514f8317c7a215E218DcCD6cF',
@@ -79,281 +112,312 @@ export default function EndorsementsPage() {
     },
   ]
 
+  useEffect(() => {
+    const fetchEndorsements = async () => {
+      if (!walletInput) {
+        setReceivedEndorsements([])
+        return
+      }
+
+      try {
+        const endorsements = await readContract(config, {
+          address: CONTRACT_ADDRESS,
+          abi: endorsementRegistryABI,
+          functionName: `getEndorsements`,
+          args: [walletInput],
+        })
+
+        setReceivedEndorsements(endorsements as string[])
+      } catch (err) {
+        console.error(`Error fetching endorsements`, err)
+        setReceivedEndorsements([])
+      }
+    }
+
+    fetchEndorsements()
+  }, [walletInput])
+
   return (
-    <div className='container py-8'>
-      <div className='mb-8'>
-        <h1 className='text-3xl font-bold'>Endorsements</h1>
-        <p className='text-muted-foreground'>
-          Build and view your on-chain reputation through peer endorsements
-        </p>
-      </div>
+    <ThirdwebProvider>
+      <div className='container py-8'>
+        <div className='mb-8'>
+          <h1 className='text-3xl font-bold'>Endorsements</h1>
+          <p className='text-muted-foreground'>
+            Build and view your on-chain reputation through peer endorsements
+          </p>
+        </div>
 
-      <div className='grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8'>
-        <Card className='lg:col-span-2 border-border'>
-          <CardHeader>
-            <CardTitle className='text-xl'>Write an Endorsement</CardTitle>
-            <CardDescription>
-              Endorse another wallet for their contributions or reliability
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className='space-y-4'>
-              <div>
-                <label
-                  htmlFor='wallet'
-                  className='block text-sm font-medium mb-1'
-                >
-                  Wallet Address
-                </label>
-                <input
-                  id='wallet'
-                  className='w-full p-2 bg-secondary border border-border rounded-md'
-                  placeholder='0x...'
-                />
-              </div>
+        <div className='grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8'>
+          <Card className='lg:col-span-2 border-border'>
+            <CardHeader>
+              <CardTitle className='text-xl'>Write an Endorsement</CardTitle>
+              <CardDescription>
+                Endorse another wallet for their contributions or reliability
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className='space-y-4'>
+                <div>
+                  <label
+                    htmlFor='wallet'
+                    className='block text-sm font-medium mb-1'
+                  >
+                    Wallet Address
+                  </label>
+                  <input
+                    id='wallet'
+                    className='w-full p-2 bg-secondary border border-border rounded-md'
+                    placeholder='0x...'
+                    value={walletInput}
+                    onChange={e => setWalletInput(e.target.value)}
+                  />
+                </div>
 
-              <div>
-                <label
-                  htmlFor='endorsement'
-                  className='block text-sm font-medium mb-1'
-                >
-                  Endorsement
-                </label>
-                <Textarea
-                  id='endorsement'
-                  placeholder='Write your endorsement here...'
-                  className='min-h-[120px]'
-                  value={endorsementText}
-                  onChange={e => setEndorsementText(e.target.value)}
-                />
-              </div>
+                <div>
+                  <label
+                    htmlFor='endorsement'
+                    className='block text-sm font-medium mb-1'
+                  >
+                    Endorsement
+                  </label>
+                  <Textarea
+                    id='endorsement'
+                    placeholder='Write your endorsement here...'
+                    className='min-h-[120px]'
+                    value={endorsementText}
+                    onChange={e => setEndorsementText(e.target.value)}
+                  />
+                </div>
 
-              <div>
-                <label className='block text-sm font-medium mb-1'>
-                  Endorsement Type
-                </label>
-                <div className='flex flex-wrap gap-2'>
-                  {endorsementTypes.map(type => (
-                    <Badge
-                      key={type}
-                      variant={selectedType === type ? 'default' : 'outline'}
-                      className={cn(
-                        'cursor-pointer hover:bg-secondary hover:text-gold',
-                        selectedType === type && 'bg-gold text-black'
-                      )}
-                      onClick={() => setSelectedType(type)}
-                    >
-                      DAO Contributor
-                    </Badge>
-                  ))}
+                <div>
+                  <label className='block text-sm font-medium mb-1'>
+                    Endorsement Type
+                  </label>
+                  <div className='flex flex-wrap gap-2'>
+                    {endorsementTypes.map(type => (
+                      <Badge
+                        key={type}
+                        variant={selectedType === type ? 'default' : 'outline'}
+                        className={cn(
+                          'cursor-pointer hover:bg-secondary hover:text-gold',
+                          selectedType === type && 'bg-gold text-black'
+                        )}
+                        onClick={() => setSelectedType(type)}
+                      >
+                        DAO Contributor
+                      </Badge>
+                    ))}
+                  </div>
                 </div>
               </div>
-            </div>
-          </CardContent>
-          <CardFooter className='flex justify-between border-t pt-6'>
-            <Button
-              variant='outline'
-              onClick={() => setShowAISuggestions(true)}
-            >
-              Generate AI Suggestion
-            </Button>
-            <ButtonGold
-              onClick={handleSubmit}
-              disabled={!endorsementText || isSubmitting}
-            >
-              {isSubmitting ? (
-                <>
-                  <Loader2 className='mr-2 h-4 w-4 animate-spin' />
-                  Submitting...
-                </>
-              ) : (
-                <>
-                  <Shield className='mr-2 h-4 w-4' />
-                  Submit Endorsement
-                </>
-              )}
-            </ButtonGold>
-          </CardFooter>
-          <AISuggestionModal
-            open={showAISuggestions}
-            onOpenChange={setShowAISuggestions}
-            walletAddress={walletAddress}
-            onSelectSuggestion={suggestion => setEndorsementText(suggestion)}
-          />
+            </CardContent>
+            <CardFooter className='flex justify-between border-t pt-6'>
+              <Button
+                variant='outline'
+                onClick={() => setShowAISuggestions(true)}
+              >
+                Generate AI Suggestion
+              </Button>
+              <ButtonGold
+                onClick={handleSubmit}
+                disabled={!endorsementText || isSubmitting}
+              >
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className='mr-2 h-4 w-4 animate-spin' />
+                    Submitting...
+                  </>
+                ) : (
+                  <>
+                    <Shield className='mr-2 h-4 w-4' />
+                    Submit Endorsement
+                  </>
+                )}
+              </ButtonGold>
+            </CardFooter>
+            <AISuggestionModal
+              open={showAISuggestions}
+              onOpenChange={setShowAISuggestions}
+              walletAddress={walletAddress}
+              onSelectSuggestion={suggestion => setEndorsementText(suggestion)}
+            />
 
-          <EndorsementSuccess
-            open={showSuccess}
-            onOpenChange={setShowSuccess}
-            walletAddress={walletAddress}
-          />
-        </Card>
+            <EndorsementSuccess
+              open={showSuccess}
+              onOpenChange={setShowSuccess}
+              walletAddress={walletAddress}
+            />
+          </Card>
+
+          <Card className='border-border'>
+            <CardHeader>
+              <CardTitle className='text-xl'>Endorsement Stats</CardTitle>
+              <CardDescription>
+                Your on-chain reputation summary
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className='space-y-6'>
+                <div className='text-center'>
+                  <div className='text-5xl font-bold text-[hsl(var(--gold))]'>
+                    {receivedEndorsements.length}
+                  </div>
+                  <div className='text-sm text-muted-foreground mt-1'>
+                    Endorsements Received
+                  </div>
+                </div>
+
+                <div className='text-center'>
+                  <div className='text-5xl font-bold text-[hsl(var(--gold))]'>
+                    {givenEndorsements.length}
+                  </div>
+                  <div className='text-sm text-muted-foreground mt-1'>
+                    Endorsements Given
+                  </div>
+                </div>
+
+                <div className='pt-4 border-t border-border'>
+                  <div className='text-sm font-medium mb-2'>
+                    Top Endorsement Types
+                  </div>
+                  <div className='space-y-2'>
+                    <div className='flex justify-between items-center'>
+                      <span className='text-sm'>DAO Contributor</span>
+                      <Badge
+                        variant='outline'
+                        className='bg-[hsl(var(--gold)/0.1)] text-[hsl(var(--gold))] border-[hsl(var(--gold)/0.2)]'
+                      >
+                        1
+                      </Badge>
+                    </div>
+                    <div className='flex justify-between items-center'>
+                      <span className='text-sm'>Reliable Trader</span>
+                      <Badge
+                        variant='outline'
+                        className='bg-[hsl(var(--gold)/0.1)] text-[hsl(var(--gold))] border-[hsl(var(--gold)/0.2)]'
+                      >
+                        1
+                      </Badge>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
 
         <Card className='border-border'>
           <CardHeader>
-            <CardTitle className='text-xl'>Endorsement Stats</CardTitle>
-            <CardDescription>Your on-chain reputation summary</CardDescription>
+            <Tabs defaultValue='received'>
+              <div className='flex items-center justify-between'>
+                <CardTitle className='text-xl'>Your Endorsements</CardTitle>
+                <TabsList>
+                  <TabsTrigger value='received'>
+                    <MessageSquare className='h-4 w-4 mr-2' />
+                    Received
+                  </TabsTrigger>
+                  <TabsTrigger value='given'>
+                    <ThumbsUp className='h-4 w-4 mr-2' />
+                    Given
+                  </TabsTrigger>
+                </TabsList>
+              </div>
+              <CardDescription>
+                On-chain attestations from other wallets
+              </CardDescription>
+            </Tabs>
           </CardHeader>
           <CardContent>
-            <div className='space-y-6'>
-              <div className='text-center'>
-                <div className='text-5xl font-bold text-[hsl(var(--gold))]'>
-                  {receivedEndorsements.length}
-                </div>
-                <div className='text-sm text-muted-foreground mt-1'>
-                  Endorsements Received
-                </div>
-              </div>
-
-              <div className='text-center'>
-                <div className='text-5xl font-bold text-[hsl(var(--gold))]'>
-                  {givenEndorsements.length}
-                </div>
-                <div className='text-sm text-muted-foreground mt-1'>
-                  Endorsements Given
-                </div>
-              </div>
-
-              <div className='pt-4 border-t border-border'>
-                <div className='text-sm font-medium mb-2'>
-                  Top Endorsement Types
-                </div>
-                <div className='space-y-2'>
-                  <div className='flex justify-between items-center'>
-                    <span className='text-sm'>DAO Contributor</span>
-                    <Badge
-                      variant='outline'
-                      className='bg-[hsl(var(--gold)/0.1)] text-[hsl(var(--gold))] border-[hsl(var(--gold)/0.2)]'
-                    >
-                      1
-                    </Badge>
+            <Tabs defaultValue='received'>
+              <TabsContent value='received'>
+                {receivedEndorsements.length > 0 ? (
+                  <div className='space-y-4'>
+                    {receivedEndorsements.map(endorsement => (
+                      <div
+                        key={endorsement.id}
+                        className='p-4 bg-secondary rounded-lg'
+                      >
+                        <div className='flex items-start gap-4'>
+                          <Avatar>
+                            <AvatarFallback className='bg-primary'>
+                              <User className='h-5 w-5' />
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className='flex-1'>
+                            <div className='flex items-center justify-between mb-2'>
+                              <div className='font-mono text-xs truncate max-w-[200px] sm:max-w-none'>
+                                {endorsement.from}
+                              </div>
+                              <Badge
+                                variant='outline'
+                                className='bg-[hsl(var(--gold)/0.1)] text-[hsl(var(--gold))] border-[hsl(var(--gold)/0.2)]'
+                              >
+                                Trust Score: {endorsement.trustScore}
+                              </Badge>
+                            </div>
+                            <p className='text-sm mb-2'>{endorsement.text}</p>
+                            <div className='text-xs text-muted-foreground'>
+                              {endorsement.date}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                  <div className='flex justify-between items-center'>
-                    <span className='text-sm'>Reliable Trader</span>
-                    <Badge
-                      variant='outline'
-                      className='bg-[hsl(var(--gold)/0.1)] text-[hsl(var(--gold))] border-[hsl(var(--gold)/0.2)]'
-                    >
-                      1
-                    </Badge>
+                ) : (
+                  <div className='text-center py-8 text-muted-foreground'>
+                    <MessageSquare className='h-12 w-12 mx-auto mb-4 opacity-50' />
+                    <p>You haven&apos;t received any endorsements yet</p>
                   </div>
-                </div>
-              </div>
-            </div>
+                )}
+              </TabsContent>
+
+              <TabsContent value='given'>
+                {givenEndorsements.length > 0 ? (
+                  <div className='space-y-4'>
+                    {givenEndorsements.map(endorsement => (
+                      <div
+                        key={endorsement.id}
+                        className='p-4 bg-secondary rounded-lg'
+                      >
+                        <div className='flex items-start gap-4'>
+                          <Avatar>
+                            <AvatarFallback className='bg-primary'>
+                              <User className='h-5 w-5' />
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className='flex-1'>
+                            <div className='flex items-center justify-between mb-2'>
+                              <div className='font-mono text-xs truncate max-w-[200px] sm:max-w-none'>
+                                To: {endorsement.to}
+                              </div>
+                              <Badge
+                                variant='outline'
+                                className='bg-secondary text-foreground'
+                              >
+                                Trust Score: {endorsement.trustScore}
+                              </Badge>
+                            </div>
+                            <p className='text-sm mb-2'>{endorsement.text}</p>
+                            <div className='text-xs text-muted-foreground'>
+                              {endorsement.date}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className='text-center py-8 text-muted-foreground'>
+                    <ThumbsUp className='h-12 w-12 mx-auto mb-4 opacity-50' />
+                    <p>You haven&apos;t given any endorsements yet</p>
+                  </div>
+                )}
+              </TabsContent>
+            </Tabs>
           </CardContent>
         </Card>
       </div>
-
-      <Card className='border-border'>
-        <CardHeader>
-          <Tabs defaultValue='received'>
-            <div className='flex items-center justify-between'>
-              <CardTitle className='text-xl'>Your Endorsements</CardTitle>
-              <TabsList>
-                <TabsTrigger value='received'>
-                  <MessageSquare className='h-4 w-4 mr-2' />
-                  Received
-                </TabsTrigger>
-                <TabsTrigger value='given'>
-                  <ThumbsUp className='h-4 w-4 mr-2' />
-                  Given
-                </TabsTrigger>
-              </TabsList>
-            </div>
-            <CardDescription>
-              On-chain attestations from other wallets
-            </CardDescription>
-          </Tabs>
-        </CardHeader>
-        <CardContent>
-          <Tabs defaultValue='received'>
-            <TabsContent value='received'>
-              {receivedEndorsements.length > 0 ? (
-                <div className='space-y-4'>
-                  {receivedEndorsements.map(endorsement => (
-                    <div
-                      key={endorsement.id}
-                      className='p-4 bg-secondary rounded-lg'
-                    >
-                      <div className='flex items-start gap-4'>
-                        <Avatar>
-                          <AvatarFallback className='bg-primary'>
-                            <User className='h-5 w-5' />
-                          </AvatarFallback>
-                        </Avatar>
-                        <div className='flex-1'>
-                          <div className='flex items-center justify-between mb-2'>
-                            <div className='font-mono text-xs truncate max-w-[200px] sm:max-w-none'>
-                              {endorsement.from}
-                            </div>
-                            <Badge
-                              variant='outline'
-                              className='bg-[hsl(var(--gold)/0.1)] text-[hsl(var(--gold))] border-[hsl(var(--gold)/0.2)]'
-                            >
-                              Trust Score: {endorsement.trustScore}
-                            </Badge>
-                          </div>
-                          <p className='text-sm mb-2'>{endorsement.text}</p>
-                          <div className='text-xs text-muted-foreground'>
-                            {endorsement.date}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className='text-center py-8 text-muted-foreground'>
-                  <MessageSquare className='h-12 w-12 mx-auto mb-4 opacity-50' />
-                  <p>You haven't received any endorsements yet</p>
-                </div>
-              )}
-            </TabsContent>
-
-            <TabsContent value='given'>
-              {givenEndorsements.length > 0 ? (
-                <div className='space-y-4'>
-                  {givenEndorsements.map(endorsement => (
-                    <div
-                      key={endorsement.id}
-                      className='p-4 bg-secondary rounded-lg'
-                    >
-                      <div className='flex items-start gap-4'>
-                        <Avatar>
-                          <AvatarFallback className='bg-primary'>
-                            <User className='h-5 w-5' />
-                          </AvatarFallback>
-                        </Avatar>
-                        <div className='flex-1'>
-                          <div className='flex items-center justify-between mb-2'>
-                            <div className='font-mono text-xs truncate max-w-[200px] sm:max-w-none'>
-                              To: {endorsement.to}
-                            </div>
-                            <Badge
-                              variant='outline'
-                              className='bg-secondary text-foreground'
-                            >
-                              Trust Score: {endorsement.trustScore}
-                            </Badge>
-                          </div>
-                          <p className='text-sm mb-2'>{endorsement.text}</p>
-                          <div className='text-xs text-muted-foreground'>
-                            {endorsement.date}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className='text-center py-8 text-muted-foreground'>
-                  <ThumbsUp className='h-12 w-12 mx-auto mb-4 opacity-50' />
-                  <p>You haven&apos;t given any endorsements yet</p>
-                </div>
-              )}
-            </TabsContent>
-          </Tabs>
-        </CardContent>
-      </Card>
-    </div>
+    </ThirdwebProvider>
   )
 }

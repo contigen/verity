@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils'
 import { WalletSidebarItem } from '@/components/wallet-sidebar-item'
 import { signOut, useSession } from 'next-auth/react'
 import { toast } from 'sonner'
+import { logo } from './ui/logo'
 
 export function Sidebar() {
   const pathname = usePathname()
@@ -31,7 +32,7 @@ export function Sidebar() {
     <aside className='sticky top-0 w-full border-r md:w-64 bg-card border-border max-h-dvh'>
       <div className='flex flex-col h-full'>
         <div className='flex items-center gap-2 p-4 border-b border-border'>
-          <Shield className='w-6 h-6 text-[hsl(var(--gold))]' />
+          {logo}
           <Link href='/' className='text-xl font-bold'>
             verity
           </Link>
@@ -41,7 +42,7 @@ export function Sidebar() {
           <WalletSidebarItem address={address!} />
           <p className='px-3 font-mono text-xs truncate'>{address}</p>
         </div>
-        <nav className='flex-1 p-2 space-y-2'>
+        <nav className='flex-1 p-2 my-4 space-y-2'>
           {navigation.map(item => (
             <Link
               key={item.name}

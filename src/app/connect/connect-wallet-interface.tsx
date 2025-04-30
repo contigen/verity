@@ -4,9 +4,11 @@ import { Button } from '@/components/ui/button'
 import { ButtonGold } from '@/components/ui/button-gold'
 import { CardContent } from '@/components/ui/card'
 import { Spinner } from '@/components/ui/spinner'
-import { Wallet, Loader2 } from 'lucide-react'
+import { connectWallet } from '@/lib/wallet'
+import { Wallet, Loader2, BotMessageSquare } from 'lucide-react'
 import { signIn } from 'next-auth/react'
 import { useState } from 'react'
+import { toast } from 'sonner'
 
 export function ConnectWalletInterface() {
   const [isAnalyzing, setIsAnalyzing] = useState(false)
@@ -24,23 +26,21 @@ export function ConnectWalletInterface() {
   const [trustScore, setTrustScore] = useState<number | null>(null)
   const [lastAnalysis, setLastAnalysis] = useState<string | null>(null)
 
-  const connect = async () => {
+  async function handleConnect() {
     setIsConnecting(true)
-
-    try {
-      // Simulate connection delay
-      await new Promise(resolve => setTimeout(resolve, 1000))
-
-      const mockAddress = '0x71C7656EC7ab88b098defB751B7401B5f6d8976F'
-      setAddress(mockAddress)
-
+    const result = await connectWallet()
+    setIsConnecting(false)
+    if (result) {
+      const { address } = result
+      setAddress(address)
       setTrustScore(78)
       setLastAnalysis('2023-04-15')
-      await signIn('credentials', { walletAddress: mockAddress })
-    } catch (error) {
-      console.error('Failed to connect wallet:', error)
-    } finally {
-      setIsConnecting(false)
+      await signIn('credentials', { walletAddress: address })
+      toast.success('Wallet Connected', {
+        description: 'Successfully connected Wallet',
+      })
+    } else {
+      toast.error('Failed to connect wallet')
     }
   }
 
@@ -48,11 +48,16 @@ export function ConnectWalletInterface() {
     <CardContent>
       {!address ? (
         <div className='flex flex-col items-center py-8'>
-          <Wallet className='w-16 h-16 mb-6 text-muted-foreground' />
+          <section className='flex items-center justify-center mb-6'>
+            <span className='font-pixel font-semibold text-7xl md:text-8xl lg:text-9xl'>
+              0x
+            </span>
+            <BotMessageSquare className='size-14 text-muted-foreground self-end' />
+          </section>
           <ButtonGold
             size='lg'
             className='w-full'
-            onClick={connect}
+            onClick={handleConnect}
             disabled={isConnecting}
           >
             {isConnecting ? (
@@ -71,7 +76,12 @@ export function ConnectWalletInterface() {
             <div className='mb-1 text-sm text-muted-foreground'>
               Connected Wallet
             </div>
-            <div className='font-mono text-sm break-all'>{address}</div>
+            <div className='font-mono text-sm break-all'>
+              <span className='text-6xl font-bold font-pixel text-gold'>
+                0x
+              </span>
+              {address.slice(2)}
+            </div>
           </div>
 
           {trustScore ? (

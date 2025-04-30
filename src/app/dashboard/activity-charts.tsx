@@ -14,7 +14,16 @@ import {
   YAxis,
 } from 'recharts'
 
-export function ActivityCharts() {
+export function ActivityCharts({
+  activityData,
+  protocolDistributionAnalysis,
+}: {
+  activityData: {
+    name: string
+    value: number
+  }[]
+  protocolDistributionAnalysis: string
+}) {
   const transactionData = [
     { name: 'Jan', value: 12 },
     { name: 'Feb', value: 19 },
@@ -22,13 +31,6 @@ export function ActivityCharts() {
     { name: 'Apr', value: 27 },
     { name: 'May', value: 32 },
     { name: 'Jun', value: 24 },
-  ]
-
-  const activityData = [
-    { name: 'DeFi', value: 45 },
-    { name: 'NFT', value: 20 },
-    { name: 'DAO', value: 15 },
-    { name: 'Other', value: 20 },
   ]
 
   const COLOURS = [
@@ -120,8 +122,7 @@ export function ActivityCharts() {
                 Protocol Diversity Analysis
               </h4>
               <p className='text-xs text-gray-400 mb-3'>
-                Your wallet shows interaction with 8 different protocols, with
-                significant activity on Uniswap (35%) and Aave (20%).
+                {protocolDistributionAnalysis}
               </p>
               <div className='space-y-2'>
                 {activityData.map((item, index) => (

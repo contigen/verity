@@ -14,9 +14,23 @@ import {
   Network,
   Activity,
   Calendar,
+  XCircle,
 } from 'lucide-react'
+import { getCachedUserIdentity, getUserWalletFromSession } from '@/actions'
+import { cn } from '@/lib/utils'
 
-export default function SignalsPage() {
+export default async function SignalsPage() {
+  const wallet = await getUserWalletFromSession()
+  const identity = await getCachedUserIdentity(wallet)
+  if (!identity?.success) {
+    throw Error(identity?.message)
+  }
+  const identityObject = identity.validatedObject
+  console.log('identity: ', identity.validatedObject?.sybilSignals)
+  const {
+    sybilSignals: { signalIndicators, verdict },
+  } = identityObject!
+
   return (
     <div className='container py-8'>
       <div className='mb-8'>
@@ -117,32 +131,28 @@ export default function SignalsPage() {
             <CardTitle className='text-xl'>AI Verdict</CardTitle>
             <CardDescription>
               Analysis summary and risk assessment
+              {verdict.riskSummary}
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Alert className='bg-[hsl(var(--gold)/0.1)] text-[hsl(var(--gold))] border-[hsl(var(--gold)/0.2)] mb-4'>
+            <Alert
+              className={cn(
+                `bg-gold/10 text-gold border-gold mb-4`,
+                verdict.riskLevel === 'Low' &&
+                  'bg-red-500 text-white border-red-300',
+                verdict.riskLevel === 'High' &&
+                  'bg-green-500 text-white border-green-300'
+              )}
+            >
               <CheckCircle className='h-4 w-4' />
-              <AlertTitle>Low Sybil Risk</AlertTitle>
-              <AlertDescription className='text-foreground'>
-                This wallet shows authentic behavior patterns
-              </AlertDescription>
+              <AlertTitle>{verdict.label}</AlertTitle>
+              <AlertDescription className='text-foreground'></AlertDescription>
             </Alert>
 
             <div className='space-y-4 text-sm'>
-              <p>
-                This wallet demonstrates consistent and organic transaction
-                patterns across multiple protocols over an extended period.
-              </p>
-              <p>
-                The transaction timing, gas usage, and interaction diversity all
-                indicate genuine human behavior rather than automated or
-                coordinated activity.
-              </p>
-              <p>
-                Network analysis shows limited clustering with other wallets,
-                suggesting this is an independent entity rather than part of a
-                Sybil group.
-              </p>
+              {verdict.riskAssessment.map((risk, idx) => (
+                <p key={idx}>{risk}</p>
+              ))}
             </div>
           </CardContent>
         </Card>
@@ -156,70 +166,45 @@ export default function SignalsPage() {
           </CardHeader>
           <CardContent>
             <div className='space-y-4'>
-              <div className='flex items-center justify-between'>
-                <div className='flex items-center'>
-                  <Badge
-                    variant='outline'
-                    className='mr-2 bg-green-500/10 text-green-500 border-green-500/20'
-                  >
-                    Safe
-                  </Badge>
-                  <span>Gas Pattern Consistency</span>
-                </div>
-                <CheckCircle className='h-5 w-5 text-green-500' />
-              </div>
+              {signalIndicators.map(({ riskTag, label }) => {
+                const isSafe = riskTag === `safe`
+                const isCaution = riskTag === `caution`
 
-              <div className='flex items-center justify-between'>
-                <div className='flex items-center'>
-                  <Badge
-                    variant='outline'
-                    className='mr-2 bg-green-500/10 text-green-500 border-green-500/20'
-                  >
-                    Safe
-                  </Badge>
-                  <span>Transaction Timing</span>
-                </div>
-                <CheckCircle className='h-5 w-5 text-green-500' />
-              </div>
+                const badgeColour = isSafe
+                  ? `green`
+                  : isCaution
+                  ? `yellow`
+                  : `red`
 
-              <div className='flex items-center justify-between'>
-                <div className='flex items-center'>
-                  <Badge
-                    variant='outline'
-                    className='mr-2 bg-green-500/10 text-green-500 border-green-500/20'
-                  >
-                    Safe
-                  </Badge>
-                  <span>Contract Interaction Diversity</span>
-                </div>
-                <CheckCircle className='h-5 w-5 text-green-500' />
-              </div>
+                const Icon = isSafe
+                  ? CheckCircle
+                  : isCaution
+                  ? AlertTriangle
+                  : XCircle
 
-              <div className='flex items-center justify-between'>
-                <div className='flex items-center'>
-                  <Badge
-                    variant='outline'
-                    className='mr-2 bg-yellow-500/10 text-yellow-500 border-yellow-500/20'
+                return (
+                  <div
+                    key={label}
+                    className='flex items-center justify-between'
                   >
-                    Caution
-                  </Badge>
-                  <span>Airdrop Claim Pattern</span>
-                </div>
-                <AlertTriangle className='h-5 w-5 text-yellow-500' />
-              </div>
-
-              <div className='flex items-center justify-between'>
-                <div className='flex items-center'>
-                  <Badge
-                    variant='outline'
-                    className='mr-2 bg-green-500/10 text-green-500 border-green-500/20'
-                  >
-                    Safe
-                  </Badge>
-                  <span>Wallet Age & Activity</span>
-                </div>
-                <CheckCircle className='h-5 w-5 text-green-500' />
-              </div>
+                    <div className='flex items-center'>
+                      <Badge
+                        variant='outline'
+                        className={cn(
+                          `mr-2`,
+                          `bg-${badgeColour}-500/10`,
+                          `text-${badgeColour}-500`,
+                          `border-${badgeColour}-500/20`
+                        )}
+                      >
+                        {riskTag.charAt(0).toUpperCase() + riskTag.slice(1)}
+                      </Badge>
+                      <span>{label}</span>
+                    </div>
+                    <Icon className={`h-5 w-5 text-${badgeColour}-500`} />
+                  </div>
+                )
+              })}
             </div>
           </CardContent>
         </Card>

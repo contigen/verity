@@ -3,6 +3,13 @@ import type { Metadata } from 'next'
 import './globals.css'
 import { cn } from '@/lib/utils'
 import { Toaster } from '@/components/ui/sonner'
+import { Pixelify_Sans } from 'next/font/google'
+
+const pixelify = Pixelify_Sans({
+  subsets: ['latin'],
+  variable: '--font-pixelify',
+  display: 'swap',
+})
 
 export const metadata: Metadata = {
   title: 'Verity | Trust Wallets. Detect Sybils.',
@@ -18,7 +25,10 @@ export default function RootLayout({
   return (
     <html lang='en' suppressHydrationWarning>
       <body
-        className={cn('min-h-screen bg-background font-sans antialiased', '')}
+        className={cn(
+          'min-h-screen bg-background font-sans antialiased',
+          pixelify.variable
+        )}
         suppressHydrationWarning
       >
         {children}

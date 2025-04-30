@@ -16,33 +16,67 @@ import {
   PieChartIcon,
 } from 'lucide-react'
 import { ActivityCharts } from './activity-charts'
+import { getCachedUserIdentity, getUserWalletFromSession } from '@/actions'
+import { cn } from '@/lib/utils'
 
-export default function DashboardPage() {
-  const trustScore = 78
+export default async function DashboardPage() {
+  const wallet = await getUserWalletFromSession()
+  const identity = await getCachedUserIdentity(wallet)!
+  if (!identity?.success) {
+    throw Error(identity?.message)
+  }
+  const identityObject = identity.validatedObject
+  console.log('identity: ', identity)
+  const {
+    tags,
+    trustScore,
+    explanation,
+    signals,
+    activityData,
+    protocolDistributionAnalysis,
+  } = identityObject!
 
+  const signalMeta = {
+    transactionDiversity: {
+      icon: Activity,
+      title: `Transaction Diversity`,
+    },
+    timeActive: {
+      icon: Clock,
+      title: `Time Active`,
+    },
+    botLikelihood: {
+      icon: Bot,
+      title: `Bot Likelihood`,
+    },
+    onchainFootprint: {
+      icon: Footprints,
+      title: `On-chain Footprint`,
+    },
+  }
   return (
     <div className='container py-8'>
       <div className='flex flex-col md:flex-row md:items-center md:justify-between mb-8'>
         <div>
           <h1 className='text-3xl font-bold'>Trust Score Dashboard</h1>
           <p className='text-muted-foreground'>
-            View and analyze your wallet&apos;s reputation
+            View and analyse your wallet&apos;s reputation
           </p>
         </div>
 
         <div className='mt-4 md:mt-0 flex items-center gap-2'>
-          <Badge variant='outline' className='bg-secondary text-foreground'>
-            DeFi User
-          </Badge>
-          <Badge variant='outline' className='bg-secondary text-foreground'>
-            NFT Collector
-          </Badge>
-          <Badge
-            variant='outline'
-            className='bg-[hsl(var(--gold)/0.1)] text-[hsl(var(--gold))] border-[hsl(var(--gold)/0.2)]'
-          >
-            Trusted
-          </Badge>
+          {tags.map((tag, idx, arr) => (
+            <Badge
+              variant='outline'
+              className={cn(
+                `bg-secondary text-foreground`,
+                idx === arr.length - 1 && `bg-gold/10 text-gold border-gold`
+              )}
+              key={tag}
+            >
+              {tag}
+            </Badge>
+          ))}
         </div>
       </div>
 
@@ -63,9 +97,8 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              <p className='text-sm text-center text-muted-foreground'>
-                Your wallet has consistent DeFi usage across 8 dApps with a
-                strong history of legitimate transactions.
+              <p className='text-sm text-pretty text-muted-foreground'>
+                {explanation}
               </p>
             </div>
           </CardContent>
@@ -88,72 +121,33 @@ export default function DashboardPage() {
                   Distribution
                 </TabsTrigger>
               </TabsList>
-              <ActivityCharts />
+              <ActivityCharts
+                {...{ activityData, protocolDistributionAnalysis }}
+              />
             </Tabs>
           </CardContent>
         </Card>
       </div>
 
       <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6'>
-        <Card className='border-border'>
-          <CardHeader className='pb-2'>
-            <CardTitle className='text-lg flex items-center'>
-              <Activity className='h-5 w-5 mr-2 text-[hsl(var(--gold))]' />
-              Transaction Diversity
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className='text-3xl font-bold mb-2'>82/100</div>
-            <p className='text-sm text-muted-foreground'>
-              High diversity across 8 different protocols and 12 token types
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className='border-border'>
-          <CardHeader className='pb-2'>
-            <CardTitle className='text-lg flex items-center'>
-              <Clock className='h-5 w-5 mr-2 text-[hsl(var(--gold))]' />
-              Time Active
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className='text-3xl font-bold mb-2'>94/100</div>
-            <p className='text-sm text-muted-foreground'>
-              Active for 2.3 years with consistent transaction patterns
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className='border-border'>
-          <CardHeader className='pb-2'>
-            <CardTitle className='text-lg flex items-center'>
-              <Bot className='h-5 w-5 mr-2 text-[hsl(var(--gold))]' />
-              Bot Likelihood
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className='text-3xl font-bold mb-2'>12/100</div>
-            <p className='text-sm text-muted-foreground'>
-              Low probability of automated or bot-like behavior
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className='border-border'>
-          <CardHeader className='pb-2'>
-            <CardTitle className='text-lg flex items-center'>
-              <Footprints className='h-5 w-5 mr-2 text-[hsl(var(--gold))]' />
-              On-chain Footprint
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className='text-3xl font-bold mb-2'>76/100</div>
-            <p className='text-sm text-muted-foreground'>
-              Strong presence with 340+ transactions across multiple chains
-            </p>
-          </CardContent>
-        </Card>
+        {Object.entries(signals).map(([key, { percentage, note }]) => {
+          const { icon: Icon, title } =
+            signalMeta[key as keyof typeof signalMeta]
+          return (
+            <Card key={key} className='border-border'>
+              <CardHeader className='pb-2'>
+                <CardTitle className='text-lg flex items-center'>
+                  <Icon className='h-5 w-5 mr-2 text-[hsl(var(--gold))]' />
+                  {title}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className='text-3xl font-bold mb-2'>{percentage}/100</div>
+                <p className='text-sm text-muted-foreground'>{note}</p>
+              </CardContent>
+            </Card>
+          )
+        })}
       </div>
     </div>
   )
