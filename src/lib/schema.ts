@@ -5,7 +5,7 @@ const signalSchema = z.object({
   note: z.string(),
 })
 
-export const reputationSchema = z.object({
+const reputationSchema = z.object({
   tags: z.array(z.string()),
   trustScore: z.number().min(0).max(100),
   explanation: z.string(),
@@ -15,9 +15,16 @@ export const reputationSchema = z.object({
     timeActive: signalSchema,
     onchainFootprint: signalSchema,
   }),
+  activityData: z.array(
+    z.object({
+      name: z.string(),
+      value: z.number(),
+    })
+  ),
+  protocolDistributionAnalysis: z.string(),
 })
 
-export const sybilSignalSchema = z.object({
+const sybilSignalSchema = z.object({
   signalIndicators: z.array(
     z.object({
       riskTag: z.enum([`safe`, `caution`, `unsafe`]),
@@ -32,12 +39,17 @@ export const sybilSignalSchema = z.object({
   }),
 })
 
+export const combinedReputationSchema = reputationSchema.extend({
+  sybilSignals: sybilSignalSchema,
+})
+
 export const compareWalletSchema = z.array(
   z.object({
+    wallet: z.string(),
     trustScore: z.number().min(0).max(100),
     similarity: z.number().min(0).max(100),
     riskLevel: z.enum([`Low`, `Medium`, `High`]),
-    clusterMatch: z.enum([`Yes`, `No`]),
+    clusterMatch: z.boolean(),
   })
 )
 
